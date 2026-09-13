@@ -1,0 +1,15 @@
+export * from "./models/index.js";
+export * from "./errors.js";
+export * from "./config.js";
+export * from "./logger.js";
+export * from "./core.js";
+export * from "./providers/WaterlooWorksProvider.js";
+export * from "./providers/FakeWaterlooWorksProvider.js";
+export * from "./providers/PlaywrightWaterlooWorksProvider.js";
+export * from "./services/verification.js";
+export * from "./services/eligibility.js";
+export * from "./services/hash.js";
+export type { ProgressFn } from "./services/BatchReplacementService.js";
+export { applyDocumentOverrides, type DocumentOverride, type ReplaceOptions } from "./services/ReplacementService.js";
+export type { IncompleteOperation } from "./services/RecoveryService.js";
+export { DocumentCleanupService, USER_DOC_TYPES, type CleanupCandidate, type CleanupPlan, type CleanupResult } from "./services/DocumentCleanupService.js";

@@ -1,0 +1,17 @@
+{
+  "name": "@ww/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pino": "^9.0.0",
+    "playwright": "^1.50.0",
+    "zod": "^3.24.0"
+  }
+}

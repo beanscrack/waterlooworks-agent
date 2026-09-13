@@ -1,0 +1,27 @@
+import fs from "node:fs";
+import { chromium } from "playwright";
+const profile = "browser-profile", base = "https://waterlooworks.uwaterloo.ca";
+const ctx = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 1500, height: 1000 } });
+await ctx.addCookies(JSON.parse(fs.readFileSync(`${profile}/storage-state.json`, "utf8")).cookies);
+const page = await ctx.newPage();
+const log = (...a) => console.log(...a);
+const save = (n, s) => fs.writeFileSync(`dumps/${n}`, s);
+await page.goto(`${base}/myAccount/co-op/full/jobs.htm`, { waitUntil: "networkidle" }); await page.waitForTimeout(1000);
+const kw = page.locator('input[placeholder*="keyword" i]').first();
+await kw.fill("software"); await kw.press("Enter"); await page.waitForLoadState("networkidle"); await page.waitForTimeout(2500);
+const rows = page.locator("table.data-viewer-table tbody tr");
+let target = -1; const n = await rows.count();
+for (let i = 0; i < n; i++) { const t = (await rows.nth(i).innerText()).replace(/\s+/g, " "); if ((await rows.nth(i).locator('button[aria-label="Apply"]').count()) && !/Applied/.test(t)) { target = i; log("target:", t.slice(0, 140)); break; } }
+const [popup] = await Promise.all([ctx.waitForEvent("page", { timeout: 15000 }).catch(() => null), rows.nth(target).locator('button[aria-label="Apply"]').click()]);
+const p = popup ?? page;
+await p.waitForLoadState("networkidle").catch(() => {}); await p.waitForTimeout(3000);
+log("popup?", !!popup, "url:", p.url());
+save("apply-form.html", await p.content());
+const text = (await p.locator("body").innerText()).replace(/\n{2,}/g, "\n");
+save("apply-form.txt", text);
+const i = text.search(/Résumé|Resume|Package|Application/); log("apply text:", text.slice(Math.max(0, i - 400), i + 3500));
+log("selects:", await p.evaluate(() => [...document.querySelectorAll("select")].map(s => ({ name: s.name || s.id, vis: s.getBoundingClientRect().width > 0, label: s.labels?.[0]?.innerText?.trim()?.slice(0, 60), options: [...s.options].map(o => o.value + "=" + o.text.trim().slice(0, 40)).slice(0, 12) }))));
+log("inputs:", await p.evaluate(() => [...document.querySelectorAll("input:not([type=hidden]), textarea")].filter(e => e.getBoundingClientRect().width > 0).map(e => `${e.type}|${e.name || e.id}|${e.value?.slice(0, 30)}|${e.labels?.[0]?.innerText?.trim().slice(0, 60) || e.getAttribute("aria-label") || ""}`)));
+log("buttons:", await p.evaluate(() => [...document.querySelectorAll("button, input[type=submit], a.btn")].filter(e => e.getBoundingClientRect().width > 0).map(e => (e.getAttribute("aria-label") || e.innerText || e.value).trim().replace(/\s+/g, " ").slice(0, 50))));
+log("hidden inputs:", await p.evaluate(() => [...document.querySelectorAll("input[type=hidden]")].map(e => e.name + "=" + e.value.slice(0, 40)).slice(0, 30)));
+await ctx.close();

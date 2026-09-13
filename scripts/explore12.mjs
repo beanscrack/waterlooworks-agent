@@ -1,0 +1,22 @@
+import fs from "node:fs";
+import { chromium } from "playwright";
+const profile = "browser-profile", base = "https://waterlooworks.uwaterloo.ca";
+const ctx = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 1500, height: 1000 } });
+await ctx.addCookies(JSON.parse(fs.readFileSync(`${profile}/storage-state.json`, "utf8")).cookies);
+const page = await ctx.newPage();
+await page.goto(`${base}/myAccount/co-op/full/documents.htm`, { waitUntil: "networkidle" });
+// Go to the Résumé grid first so the upload form is pre-scoped to résumés (selectedDocType 67).
+const view = page.locator('table.stat-table tr:has-text("Résumé") a:has-text("View")').first();
+await view.click(); await page.waitForLoadState("networkidle"); await page.waitForTimeout(1200);
+const up = page.locator('a.btn:has-text("Upload A Document"), button:has-text("Upload A Document")').first();
+console.log("upload controls:", await page.locator(':text-is("Upload A Document")').count(), "onclick:", (await up.getAttribute("onclick"))?.slice(0, 120));
+await up.click(); await page.waitForLoadState("networkidle"); await page.waitForTimeout(1500);
+console.log("url:", page.url());
+fs.writeFileSync("dumps/upload.html", await page.content());
+console.log("h1:", await page.locator("h1").allInnerTexts());
+console.log("forms:", await page.evaluate(() => [...document.querySelectorAll("form")].map(f => ({ id: f.id, name: f.name, action: f.action.slice(0, 80), method: f.method, enctype: f.enctype }))));
+console.log("inputs:", await page.evaluate(() => [...document.querySelectorAll("input, select, textarea")].filter(e => e.type !== "hidden").map(e => ({ tag: e.tagName, type: e.type, name: e.name, id: e.id, value: (e.value || "").slice(0, 40), opts: e.tagName === "SELECT" ? [...e.options].map(o => o.value + "=" + o.text.trim()).slice(0, 12) : undefined }))));
+console.log("hidden:", await page.evaluate(() => [...document.querySelectorAll("input[type=hidden]")].map(e => e.name + "=" + (e.value || "").slice(0, 30))));
+console.log("buttons:", await page.evaluate(() => [...document.querySelectorAll("button, input[type=submit], a.btn")].map(b => (b.innerText || b.value || "").trim().replace(/\s+/g, " ").slice(0, 40) + " :: " + (b.getAttribute("onclick") || "").slice(0, 100)).filter(t => t !== " :: ")));
+console.log("labels:", await page.evaluate(() => [...document.querySelectorAll("label")].map(l => l.innerText.trim().replace(/\s+/g, " ").slice(0, 60))));
+await ctx.close();

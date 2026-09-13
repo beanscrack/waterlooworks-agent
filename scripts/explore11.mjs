@@ -1,0 +1,21 @@
+import fs from "node:fs";
+import { chromium } from "playwright";
+const profile = "browser-profile", base = "https://waterlooworks.uwaterloo.ca";
+const ctx = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 1500, height: 1000 } });
+await ctx.addCookies(JSON.parse(fs.readFileSync(`${profile}/storage-state.json`, "utf8")).cookies);
+const page = await ctx.newPage();
+const log = (...a) => console.log(...a);
+await page.goto(`${base}/myAccount/co-op/full/documents.htm`, { waitUntil: "networkidle" });
+const link = page.locator('table.stat-table tr:has-text("Résumé") a:has-text("View")').first();
+const onclick = (await link.getAttribute("onclick")).replace(/numOfDays'?\s*:\s*'\d+'/, "numOfDays':'-1'");
+await page.evaluate((c) => new Function(c)(), onclick); await page.waitForLoadState("networkidle"); await page.waitForTimeout(1500);
+log("all-time headers:", await page.evaluate(() => [...document.querySelectorAll("#doc_commonTableTableID thead tr")].map(tr => [...tr.querySelectorAll("th,td")].map(x => x.innerText.trim().replace(/\s+/g, " ").slice(0, 30)))));
+log("all-time row0 tds:", await page.evaluate(() => [...document.querySelector("#doc_commonTableTableID tbody tr").querySelectorAll("th,td")].map(x => x.tagName + ":" + x.innerText.trim().replace(/\s+/g, " ").slice(0, 50))));
+log("rows:", await page.locator("#doc_commonTableTableID tbody tr").count());
+// job search row structure
+await page.goto(`${base}/myAccount/co-op/full/jobs.htm`, { waitUntil: "networkidle" });
+const kw = page.locator('input[placeholder*="keyword" i]').first(); await kw.fill("488415"); await kw.press("Enter"); await page.waitForLoadState("networkidle"); await page.waitForTimeout(2000);
+log("search headers:", await page.evaluate(() => [...document.querySelectorAll("table.data-viewer-table thead th")].map(x => x.innerText.trim().replace(/\s+/g, " "))));
+log("search row0 cells:", await page.evaluate(() => [...document.querySelector("table.data-viewer-table tbody tr").querySelectorAll("th,td")].map(x => x.tagName + ":" + x.innerText.trim().replace(/\s+/g, " ").slice(0, 60))));
+log("search row0 links:", await page.evaluate(() => [...document.querySelector("table.data-viewer-table tbody tr").querySelectorAll("a")].map(a => a.className.slice(0, 40) + "=" + a.innerText.trim().slice(0, 50) + " in " + a.closest("th,td").tagName + (a.closest("th,td").cellIndex))));
+await ctx.close();

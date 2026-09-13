@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+browser-profile/
+data/*.db
+data/*.db-*
+*.log
+browser-profile/storage-state.json
+dumps/
+data/docs/
+/apps.html
+/dash.html

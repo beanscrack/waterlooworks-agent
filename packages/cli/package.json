@@ -1,0 +1,11 @@
+{
+  "name": "@ww/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "ww": "./dist/index.js" },
+  "scripts": { "build": "tsc -b" },
+  "dependencies": {
+    "@ww/core": "0.1.0",
+    "commander": "^13.0.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "waterlooworks-agent",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build -w @ww/core && npm run build -w @ww/cli && npm run build -w @ww/mcp",
+    "test": "npm run test -w @ww/core",
+    "typecheck": "tsc -b packages/core packages/cli packages/mcp",
+    "ww": "node packages/cli/dist/index.js",
+    "ww-mcp": "node packages/mcp/dist/index.js"
+  },
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
