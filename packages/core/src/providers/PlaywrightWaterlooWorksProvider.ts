@@ -490,6 +490,9 @@ function postingFromPanel(row: JobSearchRow, info: PostingInfo): JobPosting {
     transportationHousing: s["Transportation and Housing"],
     targetedDisciplines: s["Targeted Degrees and Disciplines"],
     additionalInfo: info.additionalInfo,
+    applicationMethod: s["Application Method"],
+    requiredDocuments: s["Application Documents Required"],
+    sections: s,
     scrapedAt: new Date(),
   };
 }

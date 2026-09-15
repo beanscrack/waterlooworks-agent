@@ -3,8 +3,8 @@ import fs from "node:fs";
 import { NotFoundError, IneligibleError, NotAuthenticatedError } from "../errors.js";
 import { newId } from "../ids.js";
 import { sha256File } from "../services/hash.js";
-import type { Application, ApplicationPayload, ApplicationFilters, DocumentType, Job, Resume } from "../models/index.js";
-import { applyFilters, type UserDocument, type WaterlooWorksProvider } from "./WaterlooWorksProvider.js";
+import type { Application, ApplicationPayload, ApplicationFilters, DocumentType, Job, JobPosting, Resume } from "../models/index.js";
+import { applyFilters, type ScanJobsOptions, type UserDocument, type WaterlooWorksProvider } from "./WaterlooWorksProvider.js";
 
 export interface FakeOptions {
   authenticated?: boolean;
@@ -26,6 +26,8 @@ export class FakeWaterlooWorksProvider implements WaterlooWorksProvider {
   /** Non-résumé user documents (cover letters, "other"). */
   documents = new Map<string, UserDocument>();
   archived = new Set<string>();
+  postings = new Map<string, JobPosting>();
+  myProgram = new Set<string>();
   defaults = new Set<string>();
   readonly calls: { op: string; args: unknown[] }[] = [];
 
@@ -180,7 +182,35 @@ export class FakeWaterlooWorksProvider implements WaterlooWorksProvider {
     return copy;
   }
 
+  async scanJobs(opts: ScanJobsOptions = {}): Promise<JobPosting[]> {
+    this.assertAuth();
+    this.calls.push({ op: "scanJobs", args: [opts] });
+    const all = [...this.postings.values()].filter((p) => !opts.myProgramOnly || this.myProgram.has(p.jobId));
+    const out: JobPosting[] = [];
+    for (const p of all) {
+      if (opts.maxJobs && out.length >= opts.maxJobs) break;
+      if (opts.skip?.(p.jobId)) continue;
+      out.push(p);
+      opts.onPosting?.(p);
+    }
+    opts.onProgress?.(out.length, all.length);
+    return out;
+  }
+
   // ---- seeding helpers ----
+  seedPosting(p: Partial<JobPosting> & { jobId: string }, inMyProgram = true): JobPosting {
+    const posting: JobPosting = {
+      title: `Job ${p.jobId}`,
+      employer: "Employer",
+      applied: false,
+      scrapedAt: this.now(),
+      ...p,
+    };
+    this.postings.set(posting.jobId, posting);
+    if (inMyProgram) this.myProgram.add(posting.jobId);
+    return posting;
+  }
+
   seedJob(j: Partial<Job> & { id: string }): Job {
     const job: Job = { title: `Job ${j.id}`, employer: "Employer", status: "open", ...j };
     this.jobs.set(job.id, job);

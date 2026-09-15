@@ -87,9 +87,11 @@ export const sel = {
   },
 
   pagination: {
-    /** "1296 results" and "1 - 50". */
-    data: ".pagination--data",
+    /** "722 results", plus "1 - 50" in some viewers. The table and card viewers name it differently. */
+    data: ".table--view__pagination--data, .pagination--data",
     next: 'a[aria-label="Go to next page"]',
+    /** Orbis marks the ends of the range by adding `disabled` to the link itself. */
+    disabled: "disabled",
   },
 
   /** "Upload A Document" page reached from the documents landing/grid pages (form POST). */
@@ -105,6 +107,9 @@ export const sel = {
 
   posting: {
     header: ".dashboard-header__posting-title",
+    /** Each posting field is a label/value pair; employer prose lives inside the value. */
+    field: ".tag__key-value-list.js--question--container",
+    fieldLabel: "span.label",
     title: ".dashboard-header__posting-title h2",
     deadlineLabel: "Application Deadline",
     requiredDocsLabel: "Application Documents Required:",
@@ -127,37 +132,3 @@ export const sel = {
     wizard: "#applyWizard",
   },
 };
-
-/**
- * Field labels WaterlooWorks renders inside a posting panel. Used as section boundaries when
- * splitting the panel text; employer-written headings are deliberately absent.
- */
-export const POSTING_LABELS = [
-  "Work Term",
-  "Job Type",
-  "Job Title",
-  "Number of Job Openings",
-  "Level",
-  "Region",
-  "Job - Address Line One",
-  "Job - City",
-  "Job - Province/State",
-  "Job - Postal/Zip Code",
-  "Job - Country",
-  "Employment Location Arrangement",
-  "Additional Employment Arrangement Location Information",
-  "Work Term Duration",
-  "Special Job Requirements",
-  "Job Summary",
-  "Job Responsibilities",
-  "Required Skills",
-  "Transportation and Housing",
-  "Compensation and Benefits",
-  "Targeted Degrees and Disciplines",
-  "Application Deadline",
-  "Application Documents Required",
-  "Additional Application Information",
-  "Application Method",
-  "Organization",
-  "Division",
-] as const;

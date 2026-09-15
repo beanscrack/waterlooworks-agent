@@ -13,3 +13,8 @@ export type { ProgressFn } from "./services/BatchReplacementService.js";
 export { applyDocumentOverrides, type DocumentOverride, type ReplaceOptions } from "./services/ReplacementService.js";
 export type { IncompleteOperation } from "./services/RecoveryService.js";
 export { DocumentCleanupService, USER_DOC_TYPES, type CleanupCandidate, type CleanupPlan, type CleanupResult } from "./services/DocumentCleanupService.js";
+export { JobScanService, scopeOf, type ScanOptions, type ScanResult } from "./services/JobScanService.js";
+export { exportWorkbook, analyse, bySalaryDesc, describedText, aiSpecificity, mentionsAI, externalLabel, type JobRow, type ExportResult } from "./services/JobExportService.js";
+export { parseSalary, formatSalary, type ParsedSalary, type SalaryUnit } from "./services/salary.js";
+export { findAITooling, AI_TERMS, type AIToolingHit, type AIMatch, type AIToolCategory } from "./services/aiTooling.js";
+export { classifyApplication, type ExternalApplication, type ExternalKind } from "./services/externalApplication.js";

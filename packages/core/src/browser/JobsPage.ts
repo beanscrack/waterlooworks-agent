@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from "playwright";
 import { SelectorError } from "../errors.js";
-import { clean, findColumn, parseDate, settle, stripIcons } from "./pageUtils.js";
+import { clean, findColumn, firstVisible, parseDate, settle, stripIcons } from "./pageUtils.js";
 import { PostingPanel, type PostingInfo } from "./PostingPanel.js";
 import { routes, sel } from "./selectors.js";
 
@@ -81,14 +81,15 @@ export class JobsPage {
     }
   }
 
-  /** "1296 results" / "1 - 50" → total and the range currently shown. */
-  private async pageRange(): Promise<{ total: number; from: number; to: number } | undefined> {
-    const text = clean(await this.page.locator(sel.pagination.data).first().innerText().catch(() => ""));
+  /** "722 results", and "1 - 50" where the viewer shows it. */
+  private async counts(): Promise<{ total?: number; to?: number }> {
+    const data = await firstVisible(this.page.locator(sel.pagination.data));
+    if (!data) return {};
+    const text = clean(await data.innerText().catch(() => ""));
+    const n = (s: string) => Number(s.replace(/,/g, ""));
     const total = text.match(/([\d,]+)\s+results/);
     const range = text.match(/([\d,]+)\s*-\s*([\d,]+)/);
-    if (!total || !range) return undefined;
-    const n = (s: string) => Number(s.replace(/,/g, ""));
-    return { total: n(total[1]), from: n(range[1]), to: n(range[2]) };
+    return { total: total ? n(total[1]) : undefined, to: range ? n(range[2]) : undefined };
   }
 
   /** Read every row on the current page of the results grid. */
@@ -140,19 +141,32 @@ export class JobsPage {
         if (opts.onRow) await opts.onRow(r);
         if (opts.maxRows && seen.size >= opts.maxRows) break;
       }
-      const range = await this.pageRange();
-      opts.onPage?.(seen.size, range?.total);
+      const { total, to } = await this.counts();
+      opts.onPage?.(seen.size, total);
       if (seen.size === before) break;
       if (opts.maxRows && seen.size >= opts.maxRows) break;
-      if (range && range.to >= range.total) break;
-      const next = this.page.locator(sel.pagination.next).first();
-      if ((await next.count()) === 0 || !(await next.isVisible().catch(() => false))) break;
-      await next.click();
-      await settle(this.page, 1500);
+      if (total !== undefined && (to ?? seen.size) >= total) break;
+      if (!(await this.goToNextPage())) break;
       if (page > 200) throw new SelectorError("Job search pagination did not terminate.");
     }
     const all = [...seen.values()];
     return opts.maxRows ? all.slice(0, opts.maxRows) : all;
+  }
+
+  /**
+   * Advance one page, or report that there is none. The last page still renders a "next" link, so
+   * its `disabled` class is the signal; clicking it anyway just times out against the list item
+   * that sits over it.
+   */
+  private async goToNextPage(): Promise<boolean> {
+    const next = await firstVisible(this.page.locator(sel.pagination.next));
+    if (!next) return false;
+    const classes = (await next.getAttribute("class").catch(() => "")) ?? "";
+    if (classes.split(/\s+/).includes(sel.pagination.disabled)) return false;
+    // The surrounding <li> swallows pointer events; the link itself is the real control.
+    await next.click({ force: true });
+    await settle(this.page, 1500);
+    return true;
   }
 
   async openPosting(jobId: string): Promise<PostingInfo> {

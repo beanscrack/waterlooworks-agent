@@ -48,7 +48,9 @@ export type EventName =
   | "RESUME_UPLOADED"
   | "DOCUMENT_UPLOADED"
   | "DOCUMENT_ARCHIVED"
-  | "DOCUMENT_DEFAULT_CHANGED";
+  | "DOCUMENT_DEFAULT_CHANGED"
+  | "JOBS_SCANNED"
+  | "JOBS_EXPORTED";
 
 export function logEvent(log: Logger, event: EventName, data: Record<string, unknown>) {
   log.info({ event, ...data }, event);

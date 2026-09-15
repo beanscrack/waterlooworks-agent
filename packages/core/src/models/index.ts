@@ -248,6 +248,14 @@ export const JobPostingSchema = z.object({
   transportationHousing: z.string().optional(),
   targetedDisciplines: z.string().optional(),
   additionalInfo: z.string().optional(),
+  /** "WaterlooWorks", or an employer portal / email when the posting is applied to elsewhere. */
+  applicationMethod: z.string().optional(),
+  requiredDocuments: z.string().optional(),
+  /**
+   * Every field the posting panel rendered, verbatim and unmapped. Kept so a later question can be
+   * answered from the cache instead of re-scraping 700+ postings.
+   */
+  sections: z.record(z.string()).optional(),
   scrapedAt: z.coerce.date(),
 });
 export type JobPosting = z.infer<typeof JobPostingSchema>;

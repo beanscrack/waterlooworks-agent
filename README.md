@@ -63,12 +63,58 @@ ww operations list
 ww operations incomplete     # exit code 3 when recovery is required
 ww recover 38192 [--dry-run] [--to <résumé>] [--other <doc>]   # resubmit from snapshot, optionally with swaps
 
+# Job market scan: read every posting in your program and export it.
+ww jobs scan                        # "My Program" filter on; resumable, caches each posting in SQLite
+ww jobs scan --all --limit 100      # every program, first 100 postings
+ww jobs scan --refresh              # re-read postings already cached
+ww jobs list [--all] [--ai] [--external]   # cached postings, highest pay first
+ww jobs export -o jobs.xlsx [--all] # "All Jobs" + "AI Tooling" + "External Applications" sheets
+
 ww debug page /myAccount/co-op/applications.htm -o page.html   # selector calibration
 ```
 
 Global flags: `--json` for machine output, `--headless`, `--fake` (in-memory provider, no browser).
 
 Environment: `WW_ROOT`, `WW_DB_PATH`, `WW_PROFILE_DIR`, `WW_BASE_URL`, `WW_HEADLESS=1`, `WW_FAKE=1`, `WW_LOG_LEVEL`.
+
+## Job scan and spreadsheet export
+
+`ww jobs scan` walks the job search results grid (clicking the **My Program** quick filter unless
+`--all`), opens every row's posting panel, and splits the panel text into WaterlooWorks' own fields
+using the closed label list in `POSTING_LABELS` — employer headings like "About the role:" are not
+boundaries, so descriptions survive whole. Each posting is committed to `job_postings` as it is read,
+so an interrupted scan (the session times out after a few idle hours) resumes rather than restarts.
+
+`ww jobs export` writes one workbook:
+
+- **All Jobs** — one row per posting, highest pay first, with the verbatim compensation text next to
+  the parsed figure.
+- **AI Tooling** — every posting whose title/summary/responsibilities/skills mention AI at all, with
+  the terms that matched, the sentence each matched in, and a **Specific?** column reading
+  `specific tooling` (named a concrete tool, platform or technique — Copilot, Cursor, LLM, RAG,
+  agents, a model provider) or `generic AI` (only bare AI/ML/deep-learning wording). Filter on that
+  column rather than trusting the keyword list to make the judgment for you.
+
+- **External Applications** — postings you cannot finish inside WaterlooWorks, with the apply link
+  and the sentence that says so. Two kinds: `apply elsewhere` (the posting's **Application Method**
+  is not WaterlooWorks) and `also apply elsewhere` (WaterlooWorks *and* the employer's own form —
+  what WaterlooWorks calls a "two step process" when it warns you that cancelling here does not
+  withdraw the external half). Matching demands an apply verb aimed somewhere other than
+  WaterlooWorks, so interview-process blurbs, recruiter-contact notes and informational links do not
+  qualify; a required portfolio or take-home is likewise not an external *application*.
+
+Pay is free-form employer prose, so `parseSalary` extracts the figures and normalises them to an
+hourly rate (40 h/week, 17-week term) *only so the sheet can be sorted*; the raw text always travels
+with the row. Figures outside a plausible range for their unit are dropped, which is what keeps
+"401(k) with a 4% match" and wellness stipends out of the salary column. Rows whose pay could not be
+parsed sort to the bottom with their text intact — check those by hand.
+
+`findAITooling` matches an explicit term list (`AI_TERMS`), each term carrying a category. Bare
+"AI"/"ML"/"machine learning" hits are categorised `general-ai`; everything else counts as specific
+tooling. Both kinds reach the AI sheet — the `Specific?` column separates them, so a posting is never
+dropped by the keyword list's judgment. Edit the list in
+`packages/core/src/services/aiTooling.ts` to taste and re-run `ww jobs export` — re-scanning is not
+needed, the export reads from the cache.
 
 ## MCP server
 
@@ -148,6 +194,22 @@ Requires `poppler-utils` (`pdftoppm`, `pdfinfo`) on PATH.
 
 `ww auth status`, `ww resume list` (12 résumés incl. older than 30 days), `ww applications list` (42 rows),
 `ww job <id>`, `ww application show <id>` (deadline, required docs, résumé/other identified from the package).
+
+`ww jobs scan` (2026-09-13): "My Program" quick filter, grid pagination, and posting-panel reads all
+work against the live site — 722 postings, matching the "722 results" the grid reports.
+
+Postings store the whole label/value map in `sections` alongside the mapped fields. The first live
+run mapped only the fields the spreadsheet then needed and dropped the rest, so the next question
+("which jobs are applied to outside WaterlooWorks?") needed a second 20-minute scrape for a field
+that had already been on screen. Keep the raw blob.
+
+Posting fields are read from the `div.tag__key-value-list.js--question--container` label/value pairs,
+taking each container's whole innerText minus its label line. Two earlier approaches were wrong and
+are worth not repeating: splitting the panel text on a hardcoded label list silently merged a field
+into its predecessor whenever WaterlooWorks rendered a label the list did not know (`Job - Country`
+swallowed `Job Location (If Exact Address Unknown...)`), and reading only the value's `<p>` elements
+dropped every bullet list, because employers write a `<p>` lead-in ("You will:") followed by a
+sibling `<ul>`.
 
 ## Verified live (mutating, 2026-09-13)
 

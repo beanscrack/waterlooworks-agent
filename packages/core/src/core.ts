@@ -13,6 +13,8 @@ import { RecoveryService } from "./services/RecoveryService.js";
 import { DocumentCleanupService, type CleanupPlan } from "./services/DocumentCleanupService.js";
 import { ReplacementService, type DocumentOverride, type ReplaceOptions } from "./services/ReplacementService.js";
 import { SnapshotService } from "./services/SnapshotService.js";
+import { JobScanService, scopeOf, type ScanOptions } from "./services/JobScanService.js";
+import { exportWorkbook } from "./services/JobExportService.js";
 
 /** Facade used by both the CLI and the MCP server (spec section 2). */
 export class WaterlooWorksCore {
@@ -22,6 +24,7 @@ export class WaterlooWorksCore {
   readonly batch: BatchReplacementService;
   readonly recovery: RecoveryService;
   readonly cleanup: DocumentCleanupService;
+  readonly jobScan: JobScanService;
 
   constructor(
     readonly config: WWConfig,
@@ -35,6 +38,7 @@ export class WaterlooWorksCore {
     this.batch = new BatchReplacementService(provider, this.repos, this.replacement, log);
     this.recovery = new RecoveryService(provider, this.repos, this.replacement, log);
     this.cleanup = new DocumentCleanupService(provider, log);
+    this.jobScan = new JobScanService(provider, this.repos.jobPostings, log);
   }
 
   // ---- Level 0: read-only ----
@@ -90,8 +94,23 @@ export class WaterlooWorksCore {
   listIncompleteOperations() {
     return this.recovery.listIncomplete();
   }
+  /** Cached postings; `myProgramOnly` selects the scope a scan stored them under. */
+  listJobPostings(myProgramOnly?: boolean) {
+    return this.jobScan.list(myProgramOnly === undefined ? undefined : scopeOf(myProgramOnly));
+  }
+  /** Write the two-sheet spreadsheet from whatever is cached. */
+  async exportJobs(filePath: string, myProgramOnly?: boolean) {
+    const result = await exportWorkbook(this.listJobPostings(myProgramOnly), filePath);
+    logEvent(this.log, "JOBS_EXPORTED", { path: result.path, total: result.total, aiTooling: result.aiTooling });
+    return result;
+  }
   listOperations(limit?: number) {
     return this.repos.operations.listAll(limit);
+  }
+
+  /** Reads the job search + every posting panel into SQLite. Read-only against WaterlooWorks. */
+  scanJobs(opts?: ScanOptions) {
+    return this.jobScan.scan(opts);
   }
 
   // ---- Level 2: external mutation ----

@@ -55,28 +55,14 @@ export function inferDocumentType(label: string): "resume" | "cover_letter" | "t
 }
 
 /**
- * Split a posting's innerText into `label -> body` using a closed set of known field labels as
- * boundaries. Employer-written headings inside a section ("About the role:") are not boundaries,
- * so multi-paragraph descriptions survive intact.
+ * The first match that is actually rendered. WaterlooWorks keeps several viewers (table and card)
+ * in the DOM at once, so a bare `.first()` can land on a hidden twin whose innerText is empty.
  */
-export function sectionsByLabel(text: string, labels: readonly string[]): Record<string, string> {
-  const lines = text.split("\n").map((l) => l.trim());
-  const isLabel = (l: string) => labels.find((k) => l === k || l === `${k}:`);
-  const marks: { label: string; line: number }[] = [];
-  lines.forEach((l, i) => {
-    const k = isLabel(l);
-    if (k) marks.push({ label: k, line: i });
-  });
-  const out: Record<string, string> = {};
-  marks.forEach((m, i) => {
-    const end = i + 1 < marks.length ? marks[i + 1].line : lines.length;
-    const body = lines
-      .slice(m.line + 1, end)
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    // A label can legitimately appear twice (e.g. in a sidebar); keep the richest occurrence.
-    if (body && body.length > (out[m.label]?.length ?? 0)) out[m.label] = body;
-  });
-  return out;
+export async function firstVisible(loc: Locator): Promise<Locator | undefined> {
+  const n = await loc.count();
+  for (let i = 0; i < n; i++) {
+    const el = loc.nth(i);
+    if (await el.isVisible().catch(() => false)) return el;
+  }
+  return undefined;
 }

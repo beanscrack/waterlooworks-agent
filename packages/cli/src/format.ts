@@ -1,4 +1,4 @@
-import type { Application, BatchReplacementPlan, ReplacementResult, Resume } from "@ww/core";
+import { aiSpecificity, externalLabel, formatSalary, type Application, type BatchReplacementPlan, type JobRow, type ReplacementResult, type Resume } from "@ww/core";
 
 export const fmtDate = (d?: Date) => (d ? d.toLocaleString("en-CA", { dateStyle: "medium", timeStyle: "short" }) : "—");
 
@@ -82,4 +82,22 @@ export function table(headers: string[], rows: string[][]): string {
   const w = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
   const line = (cells: string[]) => cells.map((c, i) => (c ?? "").padEnd(w[i])).join("  ");
   return [line(headers), w.map((n) => "─".repeat(n)).join("  "), ...rows.map(line)].join("\n");
+}
+
+export function jobTable(rows: JobRow[]): string {
+  if (!rows.length) return "(no postings cached; run `ww jobs scan`)";
+  return table(
+    ["Job", "Employer", "Position", "Pay", "$/hr", "Location", "Deadline", "AI", "Outside WW"],
+    rows.map((r) => [
+      r.posting.jobId,
+      r.posting.employer,
+      r.posting.title,
+      formatSalary(r.salary),
+      r.salary.hourly !== undefined ? r.salary.hourly.toFixed(2) : "",
+      r.posting.location ?? r.posting.city ?? "",
+      fmtDate(r.posting.deadline),
+      aiSpecificity(r) === "specific tooling" ? "tool" : aiSpecificity(r) ? "gen" : "",
+      externalLabel(r) ? (r.external.kind === "method" ? "only" : "also") : "",
+    ]),
+  );
 }

@@ -9,9 +9,12 @@ import {
   type ApplicationFilters,
   type DocumentOverride,
   type DocumentType,
+  analyse,
+  bySalaryDesc,
+  mentionsAI,
   type WaterlooWorksCore,
 } from "@ww/core";
-import { applicationDetail, applicationTable, fmtDate, kv, planSummary, resultLine, resumeTable } from "./format.js";
+import { applicationDetail, applicationTable, fmtDate, jobTable, kv, planSummary, resultLine, resumeTable } from "./format.js";
 
 const program = new Command();
 program
@@ -324,6 +327,82 @@ program.command("job <id>").description("show job metadata").action((id) =>
     out(j, () => kv([["Employer", j.employer], ["Position", j.title], ["Job ID", j.id], ["Location", j.location], ["Deadline", fmtDate(j.deadline)], ["Status", j.status], ["URL", j.url]]));
   }),
 );
+
+
+const jobs = program.command("jobs").description("scan job postings and export them to a spreadsheet");
+jobs
+  .command("scan")
+  .description("read the job search results and every posting panel into the local database (read-only)")
+  .option("--all", "scan every posting, not just the ones in your program")
+  .option("--limit <n>", "stop after n postings", (v: string) => parseInt(v, 10))
+  .option("--refresh", "re-read postings already cached instead of skipping them")
+  .action((opts: { all?: boolean; limit?: number; refresh?: boolean }) =>
+    run(async () => {
+      const myProgramOnly = !opts.all;
+      let last = 0;
+      const res = await core().scanJobs({
+        myProgramOnly,
+        maxJobs: opts.limit,
+        refresh: opts.refresh,
+        onProgress: (scraped, seen, total) => {
+          if (program.opts().json || seen === last) return;
+          last = seen;
+          process.stderr.write(`\r  ${seen}${total ? `/${total}` : ""} rows, ${scraped} postings read`);
+        },
+      });
+      if (!program.opts().json) process.stderr.write("\n");
+      out(res, () =>
+        [
+          `Scope: ${res.scope}`,
+          `Postings read this run: ${res.scraped}`,
+          `Already cached (skipped): ${res.cached}`,
+          res.failed.length ? `Unreadable: ${res.failed.join(", ")}` : "",
+          `Total in database: ${res.postings.length}`,
+          "",
+          "Next: ww jobs export -o jobs.xlsx",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+    }),
+  );
+
+jobs
+  .command("list")
+  .description("show cached postings, highest pay first")
+  .option("--all", "include postings outside your program")
+  .option("--ai", "only postings whose description mentions AI")
+  .option("--external", "only postings needing an application outside WaterlooWorks")
+  .action((opts: { all?: boolean; ai?: boolean; external?: boolean }) =>
+    run(async () => {
+      let rows = analyse(core().listJobPostings(opts.all ? undefined : true)).sort(bySalaryDesc);
+      if (opts.ai) rows = rows.filter(mentionsAI);
+      if (opts.external) rows = rows.filter((r) => r.external.isExternal);
+      out(rows, () => jobTable(rows));
+    }),
+  );
+
+jobs
+  .command("export")
+  .description('write an .xlsx with "All Jobs", "AI Tooling" and "External Applications" sheets')
+  .requiredOption("-o, --out <file>", "output .xlsx path")
+  .option("--all", "include postings outside your program")
+  .action((opts: { out: string; all?: boolean }) =>
+    run(async () => {
+      const c = core();
+      const postings = c.listJobPostings(opts.all ? undefined : true);
+      if (!postings.length) throw new Error("No postings cached. Run `ww jobs scan` first.");
+      const res = await c.exportJobs(path.resolve(opts.out), opts.all ? undefined : true);
+      out(res, () =>
+        [
+          `Wrote ${res.path}`,
+          `  All Jobs:   ${res.total} postings (${res.withSalary} with a parseable rate)`,
+          `  AI Tooling: ${res.aiTooling} postings (${res.aiSpecific} naming specific tooling)`,
+          `  External:   ${res.external} postings (${res.externalOnly} applied to entirely outside WaterlooWorks)`,
+        ].join("\n"),
+      );
+    }),
+  );
 
 // ---- plans / operations / recovery ----
 const plans = program.command("plans").description("replacement plans");
